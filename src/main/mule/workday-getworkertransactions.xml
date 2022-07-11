@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:workday="http://www.mulesoft.org/schema/mule/workday"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/workday http://www.mulesoft.org/schema/mule/workday/current/mule-workday.xsd">
+	<flow name="workday-getallworkersManualFlow" doc:id="ce0737da-14a0-4819-b5c9-cd32ff83fbb0" >
+		<http:listener doc:name="Listener" doc:id="b512bdde-1e09-45f1-a880-d3522f704b34" config-ref="HTTP_Listener_config" path="/"/>
+		<async doc:name="Async" doc:id="ed8becab-a347-48f7-99c5-d3b7246716a4" >
+			<flow-ref doc:name="Call Get Workers" doc:id="d244af6a-2155-431d-8cf8-96cd8c384edf" name="workday-getallworkersFlow" />
+		</async>
+		<set-payload value="Success!" doc:name="Set Payload" doc:id="dd2e9faf-111d-468f-8c80-5a01680845ab" />
+	</flow>
+	<flow name="workday-getallworkersFlow" doc:id="d97c6170-ec79-434b-931f-a77ca3474fe1">
+		<set-variable value='${workday.testcase.organizationref}' doc:name="organizationref" doc:id="f834d9e0-27dc-45cb-9506-cbe38e2061b1" variableName="organizationref"/>
+		<set-variable value="${workday.testcase.pagesize}" doc:name="pagesize" doc:id="a317527d-d618-499f-b919-b96d491d9f6b" variableName="pagesize"/>
+		<flow-ref doc:name="Flow Reference" doc:id="58610f25-2edb-4302-82d2-50e9e048fc81" name="workday-getworkersFlow"/>
+		<ee:transform doc:name="Extract Reponse Data" doc:id="f26782d6-1c97-4130-9e6f-789e2e79af77">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="totalResults"><![CDATA[%dw 2.0
+ns ns0 urn:com.workday/bsvc
+output application/java
+---
+payload.ns0#Get_Workers_Response.ns0#Response_Results.ns0#Total_Results]]></ee:set-variable>
+				<ee:set-variable variableName="totalPages"><![CDATA[%dw 2.0
+ns ns0 urn:com.workday/bsvc
+output application/java
+---
+payload.ns0#Get_Workers_Response.ns0#Response_Results.ns0#Total_Pages]]></ee:set-variable>
+				<ee:set-variable variableName="pageResults"><![CDATA[%dw 2.0
+ns ns0 urn:com.workday/bsvc
+output application/java
+---
+payload.ns0#Get_Workers_Response.ns0#Response_Results.ns0#Page_Results]]></ee:set-variable>
+				<ee:set-variable variableName="page"><![CDATA[%dw 2.0
+ns ns0 urn:com.workday/bsvc
+output application/java
+---
+payload.ns0#Get_Workers_Response.ns0#Response_Results.ns0#Page]]></ee:set-variable>
+				<ee:set-variable variableName="workingPage"><![CDATA[%dw 2.0
+output application/java
+---
+1]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="44c6929c-0dae-44fa-b137-1f91face556d">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+var upperLimit = vars.totalPages as Number
+output application/java
+---
+1 to upperLimit]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<parallel-foreach doc:name="Parallel For Each" doc:id="393c63b7-8fa9-45fa-a228-7fe65a473d8a">
+			<vm:publish queueName="@{vmqueue.worker}" doc:name="Publish" doc:id="9cdd4186-7bc5-4e64-95f9-b3ba1afdc9f9" config-ref="VM_Config"/>
+		</parallel-foreach>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="235eb9da-3d89-4325-9874-a35d8b917666" >
+				<logger level="INFO" doc:name="Logger" doc:id="f7dbeead-6132-49a6-b85b-8a8a0d7e06c6" message="## Web Service Error : #[error.errorType.asString] ##"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="workday-processpagesFlow" doc:id="32e9bc84-1960-409a-8d17-d6fecb7598da" >
+		<vm:listener queueName="@{vmqueue.worker}" doc:name="Listener" doc:id="c67ad12c-5d96-40f7-a616-8556dbb0fc1f" config-ref="VM_Config"/>
+		<async doc:name="Async" doc:id="90aecf26-77e7-474c-801b-1d3f550ece70" >
+			<logger level="INFO" doc:name="Logger" doc:id="d9447d33-a428-406e-987a-ce5b6d751c91" message="## CONSUMING PAGE: #[payload]" />
+			<set-variable value="${workday.testcase.organizationref}" doc:name="organizationref" doc:id="7d708f25-e974-4e38-b123-95e6da574cc5" variableName="organizationref" />
+			<set-variable value="#[payload]" doc:name="Set Page Number" doc:id="f6f79f13-a792-49ce-9e62-d6bee5ed73b0" variableName="pageNumber" />
+			<flow-ref doc:name="Flow Reference" doc:id="b4ece27d-388d-4b7a-bb18-d49f97d47fd5" name="workday-getworkersFlow"/>
+			<ee:transform doc:name="Transform Message" doc:id="7853820f-edfd-481c-8258-d6f82096fea2" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<ee:transform doc:name="Extract Response Data" doc:id="2cf2a4d4-9e47-41bf-946f-afd3e28a10ae">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+ns ns0 urn:com.workday/bsvc
+---
+payload.Get_Workers_Response.Response_Data]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<foreach doc:name="For Each" doc:id="3027ff8c-f05f-4585-8146-bb82e329f17a" >
+				<vm:publish queueName="@{vmqueue.detail}" doc:name="Publish" doc:id="fdaca790-898e-44f0-97bd-e7ee17d6ab91" config-ref="VM_Config" />
+			</foreach>
+			<logger level="INFO" doc:name="Logger" doc:id="4ffaf750-c5e9-4800-9c41-be4e4679bf64" message="## DONE PROCESSING PAGE #[vars.pageNumber] ##" />
+		</async>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="0d3e8b54-199d-4fb8-80f9-f69515d07f69" >
+				<logger level="INFO" doc:name="Logger" doc:id="73ac1bc9-d421-4e6c-8d6c-a90305c7fc3a" message="## ERROR LOADING PAGE: #[vars.pageNumber] : #[error.errorType.asString] ##"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="workday-getworkersFlow" doc:id="cc34d591-db12-413f-8e7c-a9d961584d68" >
+		<set-variable value="${transaction.updated_from}" doc:name="updateFrom" doc:id="b9910698-db63-4df7-9f2b-8e682a7c96e3" variableName="updatedFrom"/>
+		<set-variable value="${transaction.updated_to}" doc:name="updated_to" doc:id="544a0c8c-cb96-4b37-8756-8db0a5b70145" variableName="updatedTo"/>
+		<ee:transform doc:name="Create Get_Workers Request" doc:id="33383630-7174-4b86-9a48-0ced9d5b742f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:com.workday/bsvc
+---
+{
+	ns0#Get_Workers_Request @(ns0#version: "v30.0"): {
+		ns0#Request_Criteria: {
+		    ns0#Transaction_Log_Criteria_Data: {
+		        ns0#Transaction_Date_Range_Data: {
+			        ns0#Updated_From: vars.updatedFrom,
+			        ns0#Updated_Through: vars.updatedTo
+                },
+            },
+			ns0#Organization_Reference: {
+				ns0#ID @(ns0#"type": "Organization_Reference_ID"): vars.organizationref
+			}
+		},
+		ns0#Response_Filter: {
+			ns0#Page: 1,
+			ns0#Count: vars.pagesize
+		},
+		ns0#Response_Group: {
+			ns0#Include_Reference: 1,
+			ns0#Include_Personal_Information: 1,
+			ns0#Include_Transaction_Log_Data: 1
+		}
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<workday:human-resources operation="Get_Workers" doc:name="Human_Resources:Get_Workers()" doc:id="11467506-8d8f-4a78-9da7-ffb9cc32843f" config-ref="Workday_Config" />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="06f7a8df-95aa-4df5-91df-efd4cd93b66e" >
+				<logger level="INFO" doc:name="Logger" doc:id="bbf3ac1b-0e4a-4d69-a3a6-ce413178b91c" message="## Web Service Error : #[error.errorType.asString] ##" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="workday-extractworkertransactionsFlow" doc:id="e7857950-135b-482e-a431-1ae5f86cabb9" >
+		<vm:listener doc:name="Listener" doc:id="da39cf49-ea2f-47f0-947a-1ac53bec973d" config-ref="VM_Config" queueName="@{vmqueue.detail}" />
+		<ee:transform doc:name="Transform Message" doc:id="472abd95-1ebc-4173-a726-600b732b4b7a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.Worker.Worker_Data.Transaction_Log_Entry_Data]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="employeeID" ><![CDATA[%dw 2.0
+output application/java
+---
+payload.Worker.Worker_Reference.*ID[1]]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="fd09da8e-4259-4070-8cef-eb50ba75ba85" >
+			<ee:transform doc:name="Create Get_Workers Request" doc:id="50f897c9-5fbb-4d4a-a378-210f76caf357">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/xml
+ns ns0 urn:com.workday/bsvc
+---
+{
+	ns0#Get_Workers_Request @(ns0#version: "v30.0"): {
+		ns0#Request_References: {
+		    ns0#Worker_Reference: {
+                ns0#ID @(ns0#"type": "Employee_ID"): vars.employeeID
+		    }
+
+		},
+		ns0#Response_Filter: {
+            ns0#As_Of_Effective_Date: payload.Transaction_Log_Entry.Transaction_Log_Data.Transaction_Entry_Moment,
+			ns0#As_Of_Entry_DateTime: payload.Transaction_Log_Entry.Transaction_Log_Data.Transaction_Entry_Moment
+		},
+		ns0#Response_Group: {
+			ns0#Include_Reference: 1,
+			ns0#Include_Personal_Information: 1
+		}
+	}
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<workday:human-resources doc:name="Human_Resources:Get_Workers()" doc:id="38448c3b-1744-4bdd-a3c0-35f72f1aed1e" config-ref="Workday_Config" operation="Get_Workers" />
+			<flow-ref doc:name="Flow Reference" doc:id="8cec430b-77ad-4f17-9721-ad80e629a5d6" name="workday-processtransactiondataFlow" />
+		</foreach>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="fb26c59f-9fd4-4672-961b-e27e83427021" >
+				<logger level="INFO" doc:name="Logger" doc:id="240841a9-c1aa-435d-8816-a38a98f7e90d" message="## ERROR EXTRACTING WORKER DETAIL : #[payload.Employee_ID] : #[error.errorType.asString] ##" />
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="workday-processtransactiondataFlow" doc:id="f2b232b1-6e3d-4712-8d73-a26acf5ed858" >
+		<ee:transform doc:name="Extract Response Data" doc:id="904def26-f68b-4758-b547-95885aa90906">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+ns ns0 urn:com.workday/bsvc
+output application/json
+---
+payload.ns0#Get_Workers_Response.ns0#Response_Data]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		<logger level="INFO" doc:name="Do Something Here" doc:id="70b07bea-27e4-46d3-9f31-fea2ac11f28b" message='"##### " #[vars.employeeID]'/>
+	</flow>	
+</mule>

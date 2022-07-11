@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_f2b232b1_6e3d_4712_8d73_a26acf5ed858_Input_Variables_employeeID = Any
+

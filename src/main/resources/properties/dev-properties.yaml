@@ -1,0 +1,19 @@
+# Listener configuration
+http:
+  host: "0.0.0.0"
+  port: "8081"
+vmqueue:
+  worker: "VM_Q_Worker"
+  detail: "VM_Q_Detail"  
+workday:
+  password: ""
+  hostname: "impl-cc.workday.com"
+  tenantname: ""
+  username: ""
+  responsetime_seconds: "360"
+  testcase:
+    organizationref: "50006854"
+    pagesize: "10"
+transaction:
+  updated_from: "2022-01-01T00:00:00.000-05:00"
+  updated_to: "2022-06-29T14:39:00.000-05:00"
